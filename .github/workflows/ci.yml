@@ -1,0 +1,83 @@
+# =============================================================================
+# CI Pipeline: Build & Push Docker Image (Multi-Architecture)
+# =============================================================================
+# 触发条件：push 到 main 分支 或 手动触发
+# 功能：构建多架构镜像 (amd64/arm64) 并推送到 Docker Hub
+# =============================================================================
+
+name: CI - Build and Push
+
+on:
+  push:
+    branches: ["main"]
+    # 只有改动这些文件才触发 CI，改 workflow 或 README 不触发
+    paths:
+      - "Dockerfile"
+      - "*.py"
+      - "requirements.txt"
+      - "*.html"
+      - "*.css"
+      - "*.js"
+  # 手动触发始终可用
+  workflow_dispatch:
+
+# -----------------------------------------------------------------------------
+# 环境变量（集中管理，方便修改）
+# -----------------------------------------------------------------------------
+env:
+  IMAGE_NAME: github-action-demo
+  DOCKERFILE_PATH: ./Dockerfile
+
+jobs:
+  build-and-push:
+    name: 🐳 Build & Push Multi-Arch Image
+    runs-on: ubuntu-latest
+
+    # 同一分支只允许一个 workflow 运行，新的会取消旧的
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # ----- 1. 拉取代码 -----
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ----- 2. 设置多架构构建环境 -----
+      - name: 🔧 Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ----- 3. 登录 Docker Hub -----
+      - name: 🔐 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ----- 4. 构建并推送镜像 -----
+      - name: 🚀 Build and push (multi-arch)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      # ----- 5. 输出构建信息 -----
+      - name: 📋 Print image info
+        run: |
+          echo "✅ 镜像已推送！"
+          echo "📦 Image: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
+          echo "🏷️  SHA Tag: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"

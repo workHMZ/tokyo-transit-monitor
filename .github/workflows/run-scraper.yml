@@ -1,0 +1,158 @@
+# =============================================================================
+# 定时运行爬虫 + 发送通知到 Synology Chat + 更新 GitHub Pages
+# =============================================================================
+# 触发：每天早上 8:00 和下午 5:30 (JST) 自动运行 或 手动触发
+# 功能：运行交通爬虫，将结果发送到 Synology Chat 并更新 GitHub Pages
+# =============================================================================
+
+name: 🚃 Run Scraper (8AM & 5:30PM JST)
+
+on:
+  # 定时触发：
+  # - 每天早上 8:00 JST (= 前一天 23:00 UTC)
+  # - 每天下午 5:30 JST (= 当天 8:30 UTC)
+  schedule:
+    - cron: '0 23 * * *'   # 8:00 JST
+    - cron: '30 8 * * *'   # 17:30 JST
+  
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      send_notification:
+        description: '是否发送通知到 Synology Chat？'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  run-scraper:
+    name: 🚀 Run Scraper & Update
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # 需要写权限来更新 GitHub Pages
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: 🚀 Run Scraper
+        id: scraper
+        run: |
+          echo "=========================================="
+          echo " 运行爬虫..."
+          echo "=========================================="
+          
+          python app.py 2>&1 | tee /tmp/scraper_output.txt
+          
+          echo ""
+          echo "=========================================="
+          echo "📤 处理输出..."
+          echo "=========================================="
+          
+          # 使用 Python 提取并验证 JSON
+          python3 << 'EOF'
+          import re, json
+          
+          with open('/tmp/scraper_output.txt', 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          match = re.search(r'\{[\s\S]*\}', content)
+          if match:
+              try:
+                  # 解析并重新格式化 JSON，确保完整性
+                  data = json.loads(match.group())
+                  with open('/tmp/json_output.txt', 'w', encoding='utf-8') as f:
+                      json.dump(data, f, ensure_ascii=False, indent=4)
+                  print(f"JSON extracted successfully! Issues: {data.get('issue_count', 0)}")
+              except json.JSONDecodeError as e:
+                  print(f"JSON parse error: {e}")
+                  with open('/tmp/json_output.txt', 'w') as f:
+                      f.write('{}')
+          else:
+              print("No JSON found in output")
+              with open('/tmp/json_output.txt', 'w') as f:
+                  f.write('{}')
+          EOF
+          
+          # 复制到项目目录供 GitHub Pages 使用
+          cp /tmp/json_output.txt transit_data.json
+          
+          echo "提取的 JSON 预览:"
+          head -20 /tmp/json_output.txt
+          echo "..."
+
+      - name: 📤 Update GitHub Pages
+        run: |
+          echo "=========================================="
+          echo "📤 更新 GitHub Pages..."
+          echo "=========================================="
+          
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add transit_data.json
+          git commit -m "🚃 Update transit data $(date '+%Y-%m-%d %H:%M') JST" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: 📤 Send Notification to Synology Chat
+        if: ${{ github.event.inputs.send_notification != 'false' }}
+        env:
+          SYNOLOGY_WEBHOOK: ${{ secrets.SYNOLOGY_CHAT_WEBHOOK }}
+        run: |
+          echo "=========================================="
+          echo "📤 发送通知到 Synology Chat..."
+          echo "=========================================="
+          
+          # 检查 JSON 文件是否有效
+          if ! jq empty /tmp/json_output.txt 2>/dev/null; then
+            echo "❌ JSON 文件无效，跳过通知"
+            exit 0
+          fi
+          
+          # 使用 jq 解析 JSON
+          UPDATE_TIME=$(jq -r '.update_time // "Unknown"' /tmp/json_output.txt)
+          ISSUE_COUNT=$(jq -r '.issue_count // 0' /tmp/json_output.txt)
+          STATUS=$(jq -r '.status // "unknown"' /tmp/json_output.txt)
+          
+          echo "解析结果: 更新时间=$UPDATE_TIME, 问题数=$ISSUE_COUNT, 状态=$STATUS"
+          
+          # 根据状态构建消息
+          if [ "$STATUS" = "all_clear" ] || [ "$ISSUE_COUNT" = "0" ]; then
+            MESSAGE="✅ 【東京交通情報】全線正常運転中！\n\n🕐 更新時間: $UPDATE_TIME (JST)\n🔗 https://workhmz.github.io/tokyo-transit-monitor/"
+          else
+            # 使用 jq 提取路线信息（最多显示5条，截取前30字符）
+            LINES_INFO=$(jq -r '.issues[:5][] | "• \(.line): \(.detail[0:30])..."' /tmp/json_output.txt 2>/dev/null || echo "")
+            
+            MESSAGE="⚠️ 【東京交通情報】${ISSUE_COUNT}件の運行情報\n\n🕐 更新: $UPDATE_TIME (JST)\n\n${LINES_INFO}\n\n🔗 詳細: https://workhmz.github.io/tokyo-transit-monitor/"
+          fi
+          
+          echo "发送消息内容:"
+          echo -e "$MESSAGE"
+          
+          # 发送到 Synology Chat
+          if [ -n "$SYNOLOGY_WEBHOOK" ]; then
+            curl -k -X POST "$SYNOLOGY_WEBHOOK" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "payload={\"text\": \"$MESSAGE\"}"
+          else
+            echo "⚠️ SYNOLOGY_WEBHOOK 未设置"
+          fi
+          
+          echo ""
+          echo "=========================================="
+          echo "✅ 完成！"
+          echo "=========================================="

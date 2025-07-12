@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.production
+.env.development
+config.ini
+secrets.json
+api_keys.txt
+__pycache__/
+*.py[cod]
+*$py.class
+*.pem

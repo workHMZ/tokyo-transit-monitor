@@ -1,0 +1,51 @@
+# =============================================================================
+# 自动启动 Stirling PDF 服务器
+# =============================================================================
+# 触发：每天早上 7:00 (JST) 自动启动 或 手动触发
+# 功能：唤醒 Azure VM 运行 PDF 服务
+# =============================================================================
+
+name: ☀️ Start PDF Server (Daily 7AM)
+
+on:
+  # 定时触发：每天早上 7:00 JST (= 前一天 22:00 UTC)
+  schedule:
+    - cron: '0 22 * * *'
+  
+  # 手动触发
+  workflow_dispatch:
+
+env:
+  AZURE_RESOURCE_GROUP: rg-stirling-project
+  AZURE_VM_NAME: vm-stirling-pdf
+
+jobs:
+  start-vm:
+    name: 🌞 Wake up Stirling PDF
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔐 Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: ⚡ Start VM
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            echo "🔄 正在唤醒 PDF 服务器..."
+            az vm start \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name ${{ env.AZURE_VM_NAME }}
+            echo "✅ vm-stirling-pdf 已启动！"
+
+      - name: 🌐 Get VM Public IP
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            IP=$(az vm show -d \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name ${{ env.AZURE_VM_NAME }} \
+              --query publicIps -o tsv)
+            echo "📍 PDF 服务器 IP: $IP"

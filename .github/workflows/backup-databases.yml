@@ -1,0 +1,273 @@
+# =============================================================================
+# Database Backup: PostgreSQL -> Azure Blob Storage
+# =============================================================================
+# 触发：每周一凌晨 4:00 JST (= 周日 19:00 UTC) 或 手动触发
+# 功能：备份 Neon/Supabase 数据库到 Azure Blob，发送结果到 Synology Chat
+# =============================================================================
+
+name: 💾 Database Backup
+
+on:
+  schedule:
+    # 每周一凌晨 4:00 JST = 周日 19:00 UTC
+    - cron: '0 19 * * 0'
+  
+  workflow_dispatch:
+    inputs:
+      databases:
+        description: '选择要备份的数据库'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'lobechat'
+          - 'vaultwarden'
+      cleanup_old:
+        description: '是否清理30天前的备份？'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  AZURE_CONTAINER: database-backups
+  BACKUP_RETENTION_DAYS: 30
+
+jobs:
+  backup:
+    name: 📦 Backup Databases
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false  # 一个失败不影响其他
+      matrix:
+        include:
+          - name: lobechat
+            db_secret: NEON_LOBECHAT_DB_URL
+            folder: neon
+            display_name: "LobeChat (Neon)"
+          - name: vaultwarden
+            db_secret: SUPABASE_VAULTWARDEN_DB_URL
+            folder: supabase
+            display_name: "Vaultwarden (Supabase)"
+          # ----------------------------------------
+          # 添加新数据库示例（取消注释即可）:
+          # ----------------------------------------
+          # - name: another_db
+          #   db_secret: SUPABASE_ANOTHER_DB_URL
+          #   folder: supabase
+          #   display_name: "Another DB (Supabase)"
+
+    outputs:
+      backup_results: ${{ steps.backup.outputs.result }}
+
+    steps:
+      # ----- 检查是否需要备份此数据库 -----
+      - name: 🔍 Check if should backup
+        id: check
+        run: |
+          INPUT="${{ github.event.inputs.databases || 'all' }}"
+          if [ "$INPUT" = "all" ] || [ "$INPUT" = "${{ matrix.name }}" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "⏩ 跳过 ${{ matrix.display_name }}（未选中）"
+          fi
+
+      # ----- 安装 PostgreSQL 17 客户端（解决 Neon 版本不匹配问题）-----
+      - name: 🔧 Install PostgreSQL 17 Client
+        if: steps.check.outputs.should_run == 'true'
+        run: |
+          # 添加 PostgreSQL 官方源
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          
+          # 安装 PostgreSQL 17 客户端
+          sudo apt-get install -y postgresql-client-17
+          
+          # 验证版本
+          echo "✅ pg_dump: $(/usr/lib/postgresql/17/bin/pg_dump --version)"
+
+      # ----- 执行备份 -----
+      - name: 💾 Backup ${{ matrix.display_name }}
+        id: backup
+        if: steps.check.outputs.should_run == 'true'
+        env:
+          DB_URL: ${{ secrets[matrix.db_secret] }}
+        run: |
+          set -e
+          
+          echo "==========================================="
+          echo "🚀 开始备份: ${{ matrix.display_name }}"
+          echo "==========================================="
+          
+          # 使用 PostgreSQL 17 的 pg_dump
+          PG_DUMP="/usr/lib/postgresql/17/bin/pg_dump"
+          
+          # 生成文件名: lobechat_20260128.sql.gz
+          DATE=$(date +'%Y%m%d')
+          FILENAME="${{ matrix.name }}_${DATE}.sql.gz"
+          
+          echo "📁 备份文件: $FILENAME"
+          
+          # 检查数据库连接字符串
+          if [ -z "$DB_URL" ]; then
+            echo "❌ 错误: 数据库连接字符串未设置 (secret: ${{ matrix.db_secret }})"
+            echo "result=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # 执行备份
+          echo "📤 正在导出数据库..."
+          START_TIME=$(date +%s)
+          
+          if ! $PG_DUMP "$DB_URL" 2>&1 | gzip > "$FILENAME"; then
+            echo "❌ pg_dump 失败"
+            echo "result=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          
+          # 验证备份文件
+          FILE_SIZE=$(stat -c%s "$FILENAME" 2>/dev/null || stat -f%z "$FILENAME")
+          FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
+          
+          echo "📊 备份大小: ${FILE_SIZE_MB} MB"
+          echo "⏱️  耗时: ${DURATION} 秒"
+          
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "⚠️ 警告: 备份文件过小 (${FILE_SIZE} bytes)，可能有问题"
+            echo "result=warning" >> $GITHUB_OUTPUT
+            echo "warning=备份文件过小" >> $GITHUB_OUTPUT
+          fi
+          
+          # 上传到 Azure Blob
+          echo ""
+          echo "☁️ 正在上传到 Azure Blob Storage..."
+          
+          az storage blob upload \
+            --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+            --container-name "${{ env.AZURE_CONTAINER }}" \
+            --file "$FILENAME" \
+            --name "${{ matrix.folder }}/$FILENAME" \
+            --overwrite true
+          
+          echo ""
+          echo "✅ 备份完成!"
+          echo "📍 路径: ${{ env.AZURE_CONTAINER }}/${{ matrix.folder }}/$FILENAME"
+          
+          # 输出结果
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+          echo "size_mb=${FILE_SIZE_MB}" >> $GITHUB_OUTPUT
+          echo "duration=${DURATION}" >> $GITHUB_OUTPUT
+
+      # ----- 记录跳过状态 -----
+      - name: 📝 Set skipped status
+        if: steps.check.outputs.should_run == 'false'
+        id: skipped
+        run: echo "result=skipped" >> $GITHUB_OUTPUT
+
+  # ===========================================================================
+  # 清理旧备份
+  # ===========================================================================
+  cleanup:
+    name: 🧹 Cleanup Old Backups
+    runs-on: ubuntu-latest
+    needs: backup
+    if: ${{ github.event.inputs.cleanup_old != 'false' }}
+    
+    steps:
+      - name: 🗑️ Delete old backups
+        run: |
+          echo "==========================================="
+          echo "🧹 清理 ${{ env.BACKUP_RETENTION_DAYS }} 天前的备份"
+          echo "==========================================="
+          
+          # 计算截止日期
+          CUTOFF_DATE=$(date -d "-${{ env.BACKUP_RETENTION_DAYS }} days" +'%Y%m%d')
+          echo "📅 删除 ${CUTOFF_DATE} 之前的备份"
+          
+          # 列出所有 blob
+          BLOBS=$(az storage blob list \
+            --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+            --container-name "${{ env.AZURE_CONTAINER }}" \
+            --query "[].name" -o tsv)
+          
+          DELETED_COUNT=0
+          
+          for BLOB in $BLOBS; do
+            # 从文件名提取日期 (格式: folder/name_YYYYMMDD.sql.gz)
+            BLOB_DATE=$(echo "$BLOB" | grep -oP '\d{8}' || echo "")
+            
+            if [ -n "$BLOB_DATE" ] && [ "$BLOB_DATE" -lt "$CUTOFF_DATE" ]; then
+              echo "🗑️ 删除: $BLOB"
+              az storage blob delete \
+                --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+                --container-name "${{ env.AZURE_CONTAINER }}" \
+                --name "$BLOB"
+              DELETED_COUNT=$((DELETED_COUNT + 1))
+            fi
+          done
+          
+          echo ""
+          echo "✅ 清理完成，共删除 ${DELETED_COUNT} 个旧备份"
+
+  # ===========================================================================
+  # 发送通知到 Synology Chat
+  # ===========================================================================
+  notify:
+    name: 📢 Send Notification
+    runs-on: ubuntu-latest
+    needs: [backup, cleanup]
+    if: always()
+    
+    steps:
+      - name: 📨 Send to Synology Chat
+        env:
+          SYNOLOGY_WEBHOOK: ${{ secrets.SYNOLOGY_CHAT_WEBHOOK }}
+        run: |
+          # 获取当前时间
+          TIMESTAMP=$(TZ='Asia/Tokyo' date +'%Y-%m-%d %H:%M JST')
+          
+          # 判断整体状态
+          BACKUP_STATUS="${{ needs.backup.result }}"
+          CLEANUP_STATUS="${{ needs.cleanup.result }}"
+          
+          if [ "$BACKUP_STATUS" = "success" ]; then
+            ICON="✅"
+            TITLE="数据库备份成功"
+          elif [ "$BACKUP_STATUS" = "failure" ]; then
+            ICON="❌"
+            TITLE="数据库备份失败"
+          else
+            ICON="⚠️"
+            TITLE="数据库备份部分完成"
+          fi
+          
+          # 构建消息
+          MESSAGE="$ICON 【$TITLE】\\n\\n"
+          MESSAGE+="🕐 时间: $TIMESTAMP\\n"
+          MESSAGE+="📦 备份状态: $BACKUP_STATUS\\n"
+          MESSAGE+="🧹 清理状态: $CLEANUP_STATUS\\n\\n"
+          MESSAGE+="📍 存储位置: Azure Blob (${{ env.AZURE_CONTAINER }})"
+          
+          echo "发送通知..."
+          echo -e "$MESSAGE"
+          
+          # 发送到 Synology Chat
+          if [ -n "$SYNOLOGY_WEBHOOK" ]; then
+            curl -k -X POST "$SYNOLOGY_WEBHOOK" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "payload={\"text\": \"$MESSAGE\"}"
+            echo ""
+            echo "✅ 通知已发送"
+          else
+            echo "⚠️ SYNOLOGY_CHAT_WEBHOOK 未设置，跳过通知"
+          fi
