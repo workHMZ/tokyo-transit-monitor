@@ -1,16 +1,10 @@
 {
-    "update_time": "2026-02-08 12:51:08",
+    "update_time": "2026-02-08 17:54:59",
     "data_source": "https://transit.yahoo.co.jp/diainfo/area/4",
     "monitored_lines_count": 52,
-    "issue_count": 35,
+    "issue_count": 8,
     "status": "issues_found",
     "issues": [
-        {
-            "line": "京浜東北根岸線",
-            "status": "運転状況",
-            "detail": "石川町駅付近でのホームドア点検の影響などで、一部列車に遅れや運休が出ています。（2月8日 12時5分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/22/0"
-        },
         {
             "line": "湘南新宿ライン",
             "status": "運転状況",
@@ -18,70 +12,10 @@
             "url": "https://transit.yahoo.co.jp/diainfo/25/0"
         },
         {
-            "line": "横須賀線",
-            "status": "運転状況",
-            "detail": "戸塚駅での車両点検の影響で、一部列車に遅れが出ています。（2月8日 11時5分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/29/0"
-        },
-        {
-            "line": "南武線[川崎～立川]",
-            "status": "運転状況",
-            "detail": "西国立駅でのホームドア点検の影響で、列車に遅れや運休が出ています。（2月8日 9時45分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/34/0"
-        },
-        {
-            "line": "中央線(快速)[東京～高尾]",
-            "status": "運転状況",
-            "detail": "10:02頃、御茶ノ水駅での車両点検の影響で、一部列車に遅れや運休が出ています。なお、青梅線との直通運転を中止しています。（2月8日 11時15分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/38/0"
-        },
-        {
-            "line": "中央総武線(各停)",
-            "status": "運転状況",
-            "detail": "三鷹駅付近で発生した架線凍結の影響で、列車に遅れや運休が出ています。なお、東京メトロ東西線との直通運転を中止しています。（2月8日 6時50分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/40/0"
-        },
-        {
-            "line": "常磐線(各停)",
-            "status": "運転状況",
-            "detail": "11:21頃、北柏駅でのホームドア点検の影響で、綾瀬〜我孫子駅間の一部列車に遅れが出ています。（2月8日 12時30分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/58/0"
-        },
-        {
-            "line": "総武線(快速)[東京～千葉]",
-            "status": "運転状況",
-            "detail": "成田線内でのポイント点検の影響で、一部列車に遅れが出ています。（2月8日 8時50分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/61/0"
-        },
-        {
-            "line": "西武池袋線・秩父線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 10時20分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/84/0"
-        },
-        {
             "line": "西武新宿線",
             "status": "運転状況",
-            "detail": "車両故障の影響で、西武新宿〜田無駅間の運転を見合わせています。運転区間の列車に遅れや運休が出ています。振替輸送を行っています。（2月8日 11時50分掲載）",
+            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 14時30分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/86/0"
-        },
-        {
-            "line": "西武国分寺線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 9時35分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/88/0"
-        },
-        {
-            "line": "西武多摩湖線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、一部列車に遅れが出ています。（2月8日 8時40分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/89/0"
-        },
-        {
-            "line": "西武有楽町線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 10時20分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/90/0"
         },
         {
             "line": "西武拝島線",
@@ -92,128 +26,32 @@
         {
             "line": "京王線",
             "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 11時0分掲載）",
+            "detail": "大雪の影響などで、一部列車に遅れや運休が出ています。（2月8日 16時30分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/102/0"
         },
         {
             "line": "京王新線",
             "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 11時0分掲載）",
+            "detail": "新宿駅での車両点検の影響で、運転を見合わせていましたが、17:40現在、運転を再開しています。なお、列車に遅れや運休が出ています。（2月8日 17時40分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/103/0"
         },
         {
             "line": "京王相模原線",
             "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 11時0分掲載）",
+            "detail": "大雪の影響などで、一部列車に遅れや運休が出ています。（2月8日 16時30分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/104/0"
         },
         {
             "line": "京王高尾線",
             "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 11時0分掲載）",
+            "detail": "大雪の影響などで、一部列車に遅れや運休が出ています。（2月8日 16時30分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/105/0"
-        },
-        {
-            "line": "京王井の頭線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れや運休が出ています。（2月8日 10時55分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/108/0"
-        },
-        {
-            "line": "小田急小田原線",
-            "status": "運転状況",
-            "detail": "大雪の影響などで、ダイヤが乱れています。なお、東京メトロ千代田線との直通運転を中止しています。（2月8日 11時5分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/109/0"
-        },
-        {
-            "line": "小田急江ノ島線",
-            "status": "運転状況",
-            "detail": "大雪の影響などで、ダイヤが乱れています。（2月8日 11時5分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/110/0"
-        },
-        {
-            "line": "小田急多摩線",
-            "status": "運転状況",
-            "detail": "大雪の影響などで、ダイヤが乱れています。（2月8日 11時5分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/111/0"
-        },
-        {
-            "line": "東急東横線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、ダイヤが乱れています。（2月8日 11時15分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/112/0"
-        },
-        {
-            "line": "東急田園都市線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、ダイヤが乱れています。（2月8日 11時15分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/114/0"
-        },
-        {
-            "line": "東急大井町線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、ダイヤが乱れています。（2月8日 11時10分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/115/0"
         },
         {
             "line": "都営新宿線",
             "status": "運転状況",
-            "detail": "車両点検の影響で、新宿〜市ケ谷駅間の運転を見合わせています。振替輸送を行っています。（2月8日 12時35分掲載）",
+            "detail": "新宿駅での車両点検の影響で、新宿〜市ケ谷駅間の運転を見合わせていましたが、17:12頃、運転を再開しました。なお、ダイヤが乱れています。（2月8日 17時12分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/130/0"
-        },
-        {
-            "line": "日暮里・舎人ライナー",
-            "status": "運転状況",
-            "detail": "大雪の影響で、ダイヤが乱れています。（2月8日 9時45分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/541/0"
-        },
-        {
-            "line": "東京メトロ日比谷線",
-            "status": "運転状況",
-            "detail": "東武スカイツリーライン内での大雪の影響で、東武スカイツリーラインとの直通運転を中止しています。（2月8日 12時15分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/134/0"
-        },
-        {
-            "line": "東京メトロ東西線",
-            "status": "運転状況",
-            "detail": "JR中央総武線(各停)内で発生した架線凍結の影響で、JR中央総武線(各停)との直通運転を中止しています。（2月8日 12時10分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/135/0"
-        },
-        {
-            "line": "東京メトロ千代田線",
-            "status": "運転状況",
-            "detail": "05:29頃、小田急小田原線内で発生した停電の影響で、ダイヤが乱れています。なお、小田急小田原線との直通運転を中止しています。（2月8日 6時30分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/136/0"
-        },
-        {
-            "line": "東京メトロ有楽町線",
-            "status": "運転状況",
-            "detail": "東武東上線内での大雪の影響で、東武東上線との直通運転を中止しています。（2月8日 10時20分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/137/0"
-        },
-        {
-            "line": "東京メトロ半蔵門線",
-            "status": "運転状況",
-            "detail": "東急田園都市線内での大雪の影響で、ダイヤが乱れています。なお、東武スカイツリーラインとの直通運転を中止しています。（2月8日 10時45分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/138/0"
-        },
-        {
-            "line": "東京メトロ副都心線",
-            "status": "運転状況",
-            "detail": "東武東上線内での大雪の影響で、ダイヤが乱れています。なお、東武東上線との直通運転を中止しています。（2月8日 12時25分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/540/0"
-        },
-        {
-            "line": "多摩都市モノレール線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れが出ています。（2月8日 5時50分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/156/0"
-        },
-        {
-            "line": "ゆりかもめ線",
-            "status": "運転状況",
-            "detail": "大雪の影響で、列車に遅れが出ています。（2月8日 7時10分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/160/0"
         }
     ]
 }
