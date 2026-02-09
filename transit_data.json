@@ -1,14 +1,14 @@
 {
-    "update_time": "2026-02-09 08:23:25",
+    "update_time": "2026-02-09 18:13:39",
     "data_source": "https://transit.yahoo.co.jp/diainfo/area/4",
     "monitored_lines_count": 52,
-    "issue_count": 4,
+    "issue_count": 2,
     "status": "issues_found",
     "issues": [
         {
             "line": "湘南新宿ライン",
             "status": "運転状況",
-            "detail": "宇都宮線内で発生した架線断線の影響で、一部列車に運休が出ています。（2月9日 4時40分掲載）",
+            "detail": "宇都宮線内で発生した架線断線の影響で、大宮〜新宿駅間の一部列車に運休が出ています。（2月9日 16時45分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/25/0"
         },
         {
@@ -16,18 +16,6 @@
             "status": "運転状況",
             "detail": "宇都宮線内で発生した架線断線の影響で、東海道本線と宇都宮線との直通運転を中止しています。（2月9日 4時45分掲載）",
             "url": "https://transit.yahoo.co.jp/diainfo/627/0"
-        },
-        {
-            "line": "西武新宿線",
-            "status": "運転状況",
-            "detail": "車両故障の影響で、田無〜本川越駅間の一部列車に運休が出ています。（2月9日 7時45分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/86/0"
-        },
-        {
-            "line": "東急田園都市線",
-            "status": "運転状況",
-            "detail": "07:26頃、田奈駅でのホームドア点検の影響などで、列車に遅れが出ています。（2月9日 8時20分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/114/0"
         }
     ]
 }
