@@ -1,45 +1,8 @@
 {
-    "update_time": "2026-02-10 18:29:32",
+    "update_time": "2026-02-11 08:31:47",
     "data_source": "https://transit.yahoo.co.jp/diainfo/area/4",
     "monitored_lines_count": 52,
-    "issue_count": 6,
-    "status": "issues_found",
-    "issues": [
-        {
-            "line": "西武池袋線・秩父線",
-            "status": "運転状況",
-            "detail": "東京メトロ有楽町線内での安全確認の影響で、一部列車に遅れや運休が出ています。なお、東京メトロ副都心線との直通運転を中止しています。（2月10日 17時0分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/84/0"
-        },
-        {
-            "line": "西武有楽町線",
-            "status": "運転状況",
-            "detail": "東京メトロ有楽町線内での安全確認の影響で、一部列車に遅れや運休が出ています。なお、東京メトロ副都心線との直通運転を中止しています。（2月10日 17時0分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/90/0"
-        },
-        {
-            "line": "小田急小田原線",
-            "status": "運転状況",
-            "detail": "17:33頃、海老名駅での救護活動の影響で、一部列車に遅れが出ています。（2月10日 17時50分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/109/0"
-        },
-        {
-            "line": "東急東横線",
-            "status": "運転状況",
-            "detail": "東京メトロ有楽町線内での安全確認の影響で、ダイヤが乱れています。（2月10日 17時15分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/112/0"
-        },
-        {
-            "line": "東京メトロ有楽町線",
-            "status": "運転状況",
-            "detail": "池袋〜東池袋駅間での安全確認の影響で、ダイヤが乱れています。なお、東武東上線との直通運転を中止しています。（2月10日 16時25分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/137/0"
-        },
-        {
-            "line": "東京メトロ副都心線",
-            "status": "運転状況",
-            "detail": "東京メトロ有楽町線内での安全確認の影響で、ダイヤが乱れています。なお、西武線・東武東上線との直通運転を中止しています。（2月10日 13時45分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/540/0"
-        }
-    ]
+    "issue_count": 0,
+    "status": "all_clear",
+    "issues": []
 }
