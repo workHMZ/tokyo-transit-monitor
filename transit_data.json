@@ -1,21 +1,27 @@
 {
-    "update_time": "2026-02-12 08:24:45",
+    "update_time": "2026-02-12 18:10:00",
     "data_source": "https://transit.yahoo.co.jp/diainfo/area/4",
     "monitored_lines_count": 52,
-    "issue_count": 2,
+    "issue_count": 3,
     "status": "issues_found",
     "issues": [
         {
-            "line": "京浜東北根岸線",
+            "line": "湘南新宿ライン",
             "status": "運転状況",
-            "detail": "蒲田駅での救護活動の影響で、一部列車に遅れが出ています。（2月12日 8時20分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/22/0"
+            "detail": "浦和〜赤羽駅間での線路内点検の影響で、一部列車に遅れが出ています。（2月12日 15時45分掲載）",
+            "url": "https://transit.yahoo.co.jp/diainfo/25/0"
         },
         {
-            "line": "埼京川越線[羽沢横浜国大～川越]",
+            "line": "西武池袋線・秩父線",
             "status": "運転状況",
-            "detail": "浮間舟渡駅での救護活動の影響で、一部列車に遅れが出ています。（2月12日 8時15分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/50/0"
+            "detail": "14:21頃、保谷駅での信号関係点検の影響で、一部列車に遅れや運休が出ています。（2月12日 17時15分掲載）",
+            "url": "https://transit.yahoo.co.jp/diainfo/84/0"
+        },
+        {
+            "line": "西武有楽町線",
+            "status": "運転状況",
+            "detail": "14:21頃、西武池袋線・秩父線内での信号関係点検の影響で、一部列車に遅れや運休が出ています。（2月12日 17時45分掲載）",
+            "url": "https://transit.yahoo.co.jp/diainfo/90/0"
         }
     ]
 }
