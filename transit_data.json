@@ -1,15 +1,8 @@
 {
-    "update_time": "2026-02-13 08:21:37",
+    "update_time": "2026-02-13 18:07:08",
     "data_source": "https://transit.yahoo.co.jp/diainfo/area/4",
     "monitored_lines_count": 52,
-    "issue_count": 1,
-    "status": "issues_found",
-    "issues": [
-        {
-            "line": "中央線(快速)[東京～高尾]",
-            "status": "運転状況",
-            "detail": "青梅線内での踏切内点検の影響で、一部列車に遅れが出ています。（2月13日 7時35分掲載）",
-            "url": "https://transit.yahoo.co.jp/diainfo/38/0"
-        }
-    ]
+    "issue_count": 0,
+    "status": "all_clear",
+    "issues": []
 }
