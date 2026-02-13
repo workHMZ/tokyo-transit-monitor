@@ -1,8 +1,27 @@
 {
-    "update_time": "2026-02-13 18:07:08",
+    "update_time": "2026-02-14 08:22:58",
     "data_source": "https://transit.yahoo.co.jp/diainfo/area/4",
     "monitored_lines_count": 52,
-    "issue_count": 0,
-    "status": "all_clear",
-    "issues": []
+    "issue_count": 3,
+    "status": "issues_found",
+    "issues": [
+        {
+            "line": "湘南新宿ライン",
+            "status": "運転状況",
+            "detail": "新川崎駅でのドア点検の影響で、一部列車に遅れが出ています。（2月14日 8時10分掲載）",
+            "url": "https://transit.yahoo.co.jp/diainfo/25/0"
+        },
+        {
+            "line": "横須賀線",
+            "status": "運転状況",
+            "detail": "新川崎駅でのドア点検の影響で、一部列車に遅れが出ています。（2月14日 8時10分掲載）",
+            "url": "https://transit.yahoo.co.jp/diainfo/29/0"
+        },
+        {
+            "line": "総武線(快速)[東京～千葉]",
+            "status": "運転状況",
+            "detail": "成田線内での車両点検の影響で、一部列車に遅れが出ています。（2月14日 8時0分掲載）",
+            "url": "https://transit.yahoo.co.jp/diainfo/61/0"
+        }
+    ]
 }
