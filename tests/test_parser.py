@@ -121,6 +121,44 @@ def test_build_output_all_clear(monitored):
     assert out["issue_count"] == 0
 
 
+class _FakeResponse:
+    content = (FIXTURES / "detail_trouble.html").read_bytes()
+
+    def raise_for_status(self):
+        pass
+
+
+class _FakeSession:
+    def __init__(self):
+        self.calls = 0
+
+    def get(self, url, timeout):
+        self.calls += 1
+        return _FakeResponse()
+
+
+def test_enrich_stops_at_time_budget(monitored, monkeypatch):
+    """詳細取得が時間上限を超えたら打ち切り、残りは一覧の要約のまま返すこと。"""
+    issues = app.parse_trouble_rows(load("area4_trouble.html"), monitored)
+    clock = iter([0.0, 0.0, app.DETAIL_FETCH_BUDGET + 1, app.DETAIL_FETCH_BUDGET + 2])
+    monkeypatch.setattr(app.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(app.time, "sleep", lambda _: None)
+
+    session = _FakeSession()
+    app.enrich_with_details(session, issues)
+
+    assert session.calls == 1
+    assert issues[0]["detail_truncated"] is False
+    assert all(i["detail_truncated"] for i in issues[1:])
+
+
+def test_session_caps_retry_after():
+    """Retry-After が長大でも job の timeout 内に収まる上限が設定されていること。"""
+    with app.create_session() as session:
+        retry = session.get_adapter(app.TARGET_URL).max_retries
+    assert retry.retry_after_max <= 60
+
+
 def test_detail_page_multiple_dd():
     """1路線に複数の dd がある場合、全て結合されること。"""
     html = (
