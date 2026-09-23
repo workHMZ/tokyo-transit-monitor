@@ -29,6 +29,7 @@ A Python-based web scraper that collects real-time train operation information f
 ├── app.py                      # Main scraper script
 ├── lines.json                  # Monitored line whitelist (edit this, not app.py)
 ├── index.html                  # Web dashboard (GitHub Pages)
+├── apple-touch-icon.png        # Home Screen / favicon icon (180x180)
 ├── tests/
 │   ├── test_parser.py          # Parser regression tests
 │   └── fixtures/               # Saved Yahoo! HTML for offline testing
@@ -79,8 +80,9 @@ with a fresh copy of the live page and re-run.
 ### Adding or Removing Monitored Lines
 
 Edit `lines.json`. Names must match Yahoo!'s notation exactly — the test suite
-verifies every whitelisted name still appears on the live page, so a typo or an
-upstream rename fails the build instead of silently dropping the line.
+verifies every whitelisted name appears in the saved fixture page, so a typo
+fails the build. Upstream renames on the live page are reported at runtime via
+`unmatched_lines` and shown as a notice on the dashboard.
 
 **Option 2: Using standard `venv` + `pip`**
 
@@ -175,6 +177,7 @@ Yahoo!路線情報から東京圏の鉄道運行情報をリアルタイムで�
 ├── app.py                      # スクレイパー本体プログラム
 ├── lines.json                  # 監視対象路線のホワイトリスト（app.pyではなくこちらを編集）
 ├── index.html                  # Webダッシュボード（GitHub Pages）
+├── apple-touch-icon.png        # ホーム画面 / favicon 用アイコン (180x180)
 ├── tests/
 │   ├── test_parser.py          # パーサーの回帰テスト
 │   └── fixtures/               # オフラインテスト用の保存済みYahoo! HTML
