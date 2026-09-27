@@ -77,6 +77,17 @@ uv run --with-requirements requirements.txt --with pytest python -m pytest tests
 If Yahoo! changes its markup, refresh `tests/fixtures/area4_all_clear.html`
 with a fresh copy of the live page and re-run.
 
+Dashboard regressions run directly in a browser, without Node dependencies:
+
+```bash
+python3 -m http.server 8000 --bind 127.0.0.1
+# Open http://127.0.0.1:8000/tests/dashboard.html in Safari or Chrome.
+```
+
+The page reports PASS/FAIL for stale-data boundaries, request timeouts and
+recovery, keyboard focus, theme contrast, and responsive scrolling. It uses
+local fixture data and does not run the scraper or send notifications.
+
 ### Adding or Removing Monitored Lines
 
 Edit `lines.json`. Names must match Yahoo!'s notation exactly — the test suite

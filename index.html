@@ -17,12 +17,15 @@
             --color-separator: hsl(240, 8%, 13%);
             --color-widget-content-border: hsl(240, 8%, 13%);
             --color-primary: hsl(43, 50%, 70%);
+            --color-link: hsl(43, 50%, 70%);
+            --color-notice: hsl(38, 90%, 65%);
+            --color-success-text: #000;
             --color-text-highlight: hsl(240, 8%, 85%);
             --color-text-base: hsl(240, 8%, 58%);
-            --color-text-subdue: hsl(240, 8%, 35%);
+            --color-text-subdue: hsl(240, 8%, 58%);
             --color-success: hsl(142, 50%, 45%);
             --color-warning: hsl(38, 90%, 55%);
-            --color-error: hsl(0, 70%, 55%);
+            --color-error: hsl(0, 70%, 48%);
             --border-radius: 5px;
             --font-family: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
@@ -35,10 +38,13 @@
                 --color-separator: hsl(0, 0%, 90%);
                 --color-widget-content-border: hsl(0, 0%, 85%);
                 --color-primary: hsl(43, 70%, 55%);
+                --color-link: hsl(38, 90%, 28%);
+                --color-notice: hsl(38, 90%, 28%);
+                --color-success-text: #fff;
                 --color-text-highlight: hsl(0, 0%, 10%);
                 --color-text-base: hsl(0, 0%, 40%);
-                --color-text-subdue: hsl(0, 0%, 65%);
-                --color-success: hsl(142, 60%, 35%);
+                --color-text-subdue: hsl(0, 0%, 40%);
+                --color-success: hsl(142, 60%, 30%);
                 --color-warning: hsl(38, 80%, 45%);
                 --color-error: hsl(0, 65%, 50%);
             }
@@ -51,10 +57,13 @@
             --color-separator: hsl(0, 0%, 90%);
             --color-widget-content-border: hsl(0, 0%, 85%);
             --color-primary: hsl(43, 70%, 55%);
+            --color-link: hsl(38, 90%, 28%);
+            --color-notice: hsl(38, 90%, 28%);
+            --color-success-text: #fff;
             --color-text-highlight: hsl(0, 0%, 10%);
             --color-text-base: hsl(0, 0%, 40%);
-            --color-text-subdue: hsl(0, 0%, 65%);
-            --color-success: hsl(142, 60%, 35%);
+            --color-text-subdue: hsl(0, 0%, 40%);
+            --color-success: hsl(142, 60%, 30%);
             --color-warning: hsl(38, 80%, 45%);
             --color-error: hsl(0, 65%, 50%);
         }
@@ -66,12 +75,15 @@
             --color-separator: hsl(240, 8%, 13%);
             --color-widget-content-border: hsl(240, 8%, 13%);
             --color-primary: hsl(43, 50%, 70%);
+            --color-link: hsl(43, 50%, 70%);
+            --color-notice: hsl(38, 90%, 65%);
+            --color-success-text: #000;
             --color-text-highlight: hsl(240, 8%, 85%);
             --color-text-base: hsl(240, 8%, 58%);
-            --color-text-subdue: hsl(240, 8%, 35%);
+            --color-text-subdue: hsl(240, 8%, 58%);
             --color-success: hsl(142, 50%, 45%);
             --color-warning: hsl(38, 90%, 55%);
-            --color-error: hsl(0, 70%, 55%);
+            --color-error: hsl(0, 70%, 48%);
         }
 
         * {
@@ -264,7 +276,7 @@
 
         .line-status.status-success {
             background-color: var(--color-success);
-            color: #fff;
+            color: var(--color-success-text);
         }
 
         .expand-indicator {
@@ -308,7 +320,7 @@
         }
 
         .line-link {
-            color: var(--color-primary);
+            color: var(--color-link);
             text-decoration: none;
             display: inline-flex;
             align-items: center;
@@ -369,7 +381,7 @@
         }
 
         .footer a {
-            color: var(--color-primary);
+            color: var(--color-link);
             text-decoration: none;
         }
 
@@ -379,7 +391,7 @@
             padding: 0.5rem 0.7rem;
             border: 1px solid var(--color-warning);
             border-radius: var(--border-radius);
-            color: var(--color-warning);
+            color: var(--color-notice);
             font-size: 11px;
             line-height: 1.5;
         }
@@ -418,7 +430,7 @@
             }
 
             .line-detail {
-                font-size: 13px;
+                font-size: 14px;
             }
 
             .line-link {
@@ -506,6 +518,7 @@
         // Data loading
         const DATA_URL = 'transit_data.json';
         const DEFAULT_DETAIL_URL = 'https://transit.yahoo.co.jp/diainfo/area/4';
+        const FETCH_TIMEOUT_MS = 15 * 1000;
 
         // スクレイパーの cron 発火時刻 (UTC)。workflow の schedule と一致させること。
         // 22:15Z -> 7:30 JST / 02:45Z -> 12:00 JST / 08:15Z -> 17:30 JST
@@ -566,12 +579,10 @@
             }
 
             const now = new Date();
-            const expected = lastExpectedRun(now);
-
-            // 直近の実行予定時刻より前のデータのまま猶予を過ぎている = 実行が飛んでいる
-            const missed = expected !== null
-                && t < expected
-                && (now - expected) > GRACE_MS;
+            // Only consider runs whose grace period has expired. A new scheduled
+            // run must not hide an already missed earlier run.
+            const expected = lastExpectedRun(new Date(now.getTime() - GRACE_MS));
+            const missed = expected !== null && t < expected;
 
             if (missed) {
                 const ageMin = Math.floor((now - t) / (60 * 1000));
@@ -592,7 +603,35 @@
         const expandedLines = new Set();
         // 最後に取得できたデータ。地下などで一時的に取得に失敗しても表示を消さないために使う
         let lastData = null;
-        let loading = false;
+        let activeRequest = null;
+        let renderedContent = null;
+
+        function replaceContent(html) {
+            if (html === renderedContent) return;
+            const content = document.getElementById('content');
+            const focused = document.activeElement;
+            const oldItems = Array.from(content.querySelectorAll('.line-item'));
+            const focusedItem = focused.closest('.line-item');
+            const focusedIndex = oldItems.indexOf(focusedItem);
+            const control = focused.matches('.line-link') ? '.line-link' : '.line-header';
+
+            content.innerHTML = html;
+            renderedContent = html;
+
+            // Restore only focus that was inside a replaced card, without scrolling.
+            if (focusedIndex !== -1) {
+                const items = Array.from(content.querySelectorAll('.line-item'));
+                const sameItem = items.find(item => item.dataset.line === focusedItem.dataset.line);
+                const nextItem = items[Math.min(focusedIndex, items.length - 1)];
+                const target = sameItem?.querySelector(control) || nextItem?.querySelector('.line-header');
+                if (target) {
+                    target.focus({ preventScroll: true });
+                } else {
+                    content.tabIndex = -1;
+                    content.focus({ preventScroll: true });
+                }
+            }
+        }
 
         // Yahoo! の https URL 以外はリンクにしない
         function safeDetailUrl(url) {
@@ -625,7 +664,6 @@
         }
 
         function render(data) {
-            const content = document.getElementById('content');
             const statusDot = document.getElementById('statusDot');
 
             document.getElementById('updateTime').textContent =
@@ -641,54 +679,71 @@
 
             if (data.status === 'all_clear' || !data.issue_count) {
                 statusDot.classList.remove('has-issues');
-                content.innerHTML = `
+                replaceContent(`
                     <div class="all-clear">
                         <div class="all-clear-icon">✅</div>
                         <div class="all-clear-text">全線正常運転中</div>
                         <div style="margin-top: 0.5rem; font-size: 11px;">監視中: ${Number(data.monitored_lines_count) || 0}路線</div>
                     </div>
-                `;
+                `);
                 return;
             }
 
             statusDot.classList.add('has-issues');
-            content.innerHTML = `
+            replaceContent(`
                 <div class="status-summary has-issues">
                     <div class="summary-text">⚠️ ${Number(data.issue_count) || 0}件の運行情報があります</div>
                 </div>
                 <div class="line-list">
                     ${(data.issues || []).map(renderIssue).join('')}
                 </div>
-            `;
+            `);
         }
 
         async function loadTransitData() {
-            if (loading) return;
-            loading = true;
+            if (lastData) updateStaleBanner(lastData, document.getElementById('statusDot'));
+            if (activeRequest) {
+                if (Date.now() - activeRequest.startedAt < FETCH_TIMEOUT_MS) return;
+                // Timers can pause while Safari is suspended. Check wall time on return.
+                activeRequest.controller.abort();
+            }
+            const request = { controller: new AbortController(), startedAt: Date.now() };
+            activeRequest = request;
+            const timeout = setTimeout(() => request.controller.abort(), FETCH_TIMEOUT_MS);
             try {
-                const response = await fetch(DATA_URL + '?t=' + Date.now());
+                const response = await fetch(DATA_URL + '?t=' + Date.now(), {
+                    signal: request.controller.signal,
+                });
                 if (!response.ok) throw new Error('データを取得できませんでした');
 
                 const data = await response.json();
+                if (activeRequest !== request) return;
+                render(data);
                 lastData = data;
                 setNotice('fetchErrorNotice', '');
-                render(data);
             } catch (error) {
+                if (activeRequest !== request) return;
                 if (lastData) {
                     // 前回の表示は残し、取得失敗だけを知らせる
                     setNotice('fetchErrorNotice',
                         '⚠️ 最新データを取得できませんでした。前回取得分を表示しています。');
                     updateStaleBanner(lastData, document.getElementById('statusDot'));
                 } else {
-                    document.getElementById('content').innerHTML = `
+                    const message = request.controller.signal.aborted
+                        ? 'データの取得がタイムアウトしました'
+                        : error.message;
+                    document.getElementById('updateTime').textContent = '取得失敗';
+                    document.getElementById('statusDot').classList.add('stale');
+                    replaceContent(`
                         <div class="error-message">
-                            ⚠️ ${escapeHtml(error.message)}<br>
+                            ⚠️ ${escapeHtml(message)}<br>
                             <small>ページをリロードしてお試しください</small>
                         </div>
-                    `;
+                    `);
                 }
             } finally {
-                loading = false;
+                clearTimeout(timeout);
+                if (activeRequest === request) activeRequest = null;
             }
         }
 

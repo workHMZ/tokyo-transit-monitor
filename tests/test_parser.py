@@ -80,6 +80,23 @@ def test_broken_table_raises_instead_of_false_all_clear(monitored):
         app.parse_trouble_rows(load("area4_broken.html"), monitored)
 
 
+@pytest.mark.parametrize("bad_cells", [
+    "<td>京葉線</td><td>列車遅延</td><td></td>",
+    "<td>京葉線</td><td></td><td>遅延情報</td>",
+    "<td>京葉線</td><td>列車遅延</td>",
+    "<td></td><td>列車遅延</td><td>遅延情報</td>",
+])
+def test_partial_parse_cannot_publish_all_clear(monitored, bad_cells):
+    html = (
+        '<div id="mdStatusTroubleLine"><table>'
+        f'<tr>{bad_cells}</tr>'
+        '<tr><td>東海道新幹線</td><td>列車遅延</td><td>遅延情報</td></tr>'
+        '</table></div>'
+    )
+    with pytest.raises(app.TransitParseError):
+        app.parse_trouble_rows(app.make_soup(html), monitored)
+
+
 def test_renamed_line_is_reported():
     page_lines = app.collect_page_line_names(load("area4_all_clear.html"))
     missing = app.warn_missing_lines(page_lines, {"山手線", "存在しない線"})
@@ -89,15 +106,18 @@ def test_renamed_line_is_reported():
 # --- 詳細ページ ---
 
 def test_detail_page_full_text():
-    text = app.parse_detail_page((FIXTURES / "detail_trouble.html").read_bytes())
-    assert text is not None
-    assert not text.endswith("...")
-    assert "運転再開見込みは8時30分頃です" in text
+    result = app.parse_detail_page((FIXTURES / "detail_trouble.html").read_bytes())
+    assert result is not None
+    assert result["status"] == "運転見合わせ"
+    assert result["all_clear"] is False
+    assert not result["detail"].endswith("...")
+    assert "運転再開見込みは8時30分頃です" in result["detail"]
 
 
 def test_detail_page_normal():
-    text = app.parse_detail_page((FIXTURES / "detail_normal.html").read_bytes())
-    assert text is not None and "情報はありません" in text
+    result = app.parse_detail_page((FIXTURES / "detail_normal.html").read_bytes())
+    assert result is not None and "情報はありません" in result["detail"]
+    assert result["all_clear"] is True
 
 
 def test_detail_page_unparseable_returns_none():
@@ -169,5 +189,52 @@ def test_detail_page_multiple_dd():
         b'<dd class="trouble"><p>BBB</p></dd>'
         b'</dl></div>'
     )
-    text = app.parse_detail_page(html)
-    assert "AAA" in text and "BBB" in text
+    result = app.parse_detail_page(html)
+    assert "AAA" in result["detail"] and "BBB" in result["detail"]
+    assert result["status"] == "運転見合わせ・運休"
+
+
+def test_enrich_removes_recovered_line_and_updates_counts(monitored, monkeypatch):
+    monkeypatch.setattr(_FakeResponse, "content", (FIXTURES / "detail_normal.html").read_bytes())
+    monkeypatch.setattr(app.time, "sleep", lambda _: None)
+    issues = app.parse_trouble_rows(load("area4_trouble.html"), monitored)
+    session = _FakeSession()
+    app.enrich_with_details(session, issues)
+    out = app.build_output(issues, monitored, [])
+    assert session.calls == 3
+    assert out["issues"] == []
+    assert out["issue_count"] == 0
+    assert out["status"] == "all_clear"
+
+
+def test_enrich_updates_status_with_detail(monitored):
+    issues = app.parse_trouble_rows(load("area4_trouble.html"), monitored)[1:2]
+    assert issues[0]["status"] == "列車遅延"
+    app.enrich_with_details(_FakeSession(), issues)
+    assert issues[0]["status"] == "運転見合わせ"
+    assert "運転を見合わせています" in issues[0]["detail"]
+
+
+@pytest.mark.parametrize("markup", [
+    '<dd class="normal">情報はありません</dd>',
+    '<dt>平常運転</dt><dd></dd>',
+    '<dt>平常運転</dt><dd>不明な内容</dd>',
+    '<dt>運転見合わせ</dt><dd>運転見合わせ中</dd><dt>運休</dt><dd></dd>',
+])
+def test_incomplete_detail_preserves_area_snapshot(monitored, monkeypatch, markup):
+    monkeypatch.setattr(_FakeResponse, "content", f'<div id="mdServiceStatus"><dl>{markup}</dl></div>'.encode())
+    issues = app.parse_trouble_rows(load("area4_trouble.html"), monitored)[:1]
+    original = issues[0].copy()
+    app.enrich_with_details(_FakeSession(), issues)
+    assert issues == [original]
+
+
+def test_active_detail_takes_precedence_over_normal():
+    html = (
+        '<div id="mdServiceStatus"><dl>'
+        '<dt>平常運転</dt><dd>事故・遅延情報はありません</dd>'
+        '<dt>運休</dt><dd>一部列車は運休します</dd>'
+        '</dl></div>'
+    )
+    result = app.parse_detail_page(html.encode())
+    assert result == {"status": "運休", "detail": "一部列車は運休します", "all_clear": False}

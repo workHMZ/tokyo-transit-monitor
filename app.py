@@ -139,8 +139,10 @@ def parse_trouble_rows(soup: BeautifulSoup, monitored: set[str]) -> list[dict]:
 
     for row in trouble_section.find_all("tr"):
         cells = row.find_all("td")
-        if len(cells) < 3:
+        if not cells:
             continue
+        if len(cells) < 3:
+            raise TransitParseError("運行情報の行に必要な列がありません。")
 
         link = cells[0].find("a")
         if link:
@@ -154,7 +156,10 @@ def parse_trouble_rows(soup: BeautifulSoup, monitored: set[str]) -> list[dict]:
         detail = cells[2].get_text(" ", strip=True)
 
         if not line_name or not status or not detail:
-            continue
+            # Never publish an all-clear result after silently dropping an incident.
+            raise TransitParseError(
+                f"運行情報の行が不完全です: {line_name or '路線名不明'}"
+            )
 
         parsed_rows += 1
 
@@ -199,19 +204,33 @@ def warn_missing_lines(page_lines: set[str], monitored: set[str]) -> list[str]:
     return missing
 
 
-def parse_detail_page(html: bytes) -> str | None:
-    """詳細ページ (#mdServiceStatus) から省略されていない本文を取り出す。"""
+def parse_detail_page(html: bytes) -> dict | None:
+    """Read status and detail together from the same upstream snapshot."""
     soup = make_soup(html)
     status_block = soup.find(id="mdServiceStatus")
     if status_block is None:
         return None
-    # 1路線に複数の情報（運行情報 + 運休情報など）が並ぶことがあるため全て拾う。
-    parts = [
-        dd.get_text(" ", strip=True)
-        for dd in status_block.find_all("dd")
-    ]
-    text = " ".join(p for p in parts if p)
-    return text or None
+    entries = []
+    for dd in status_block.find_all("dd"):
+        dt = dd.find_previous_sibling()
+        status = dt.get_text(" ", strip=True) if dt and dt.name == "dt" else ""
+        detail = dd.get_text(" ", strip=True)
+        if not status or not detail:
+            return None
+        if status == "平常運転" and not NO_TROUBLE_PATTERN.search(detail):
+            return None
+        entries.append({"status": status, "detail": detail})
+    if not entries:
+        return None
+
+    # An active incident takes precedence over any normal-service entry.
+    active = [entry for entry in entries if entry["status"] != "平常運転"]
+    selected = active or entries
+    return {
+        "status": "・".join(dict.fromkeys(entry["status"] for entry in selected)),
+        "detail": " ".join(entry["detail"] for entry in selected),
+        "all_clear": not active,
+    }
 
 
 def enrich_with_details(session: requests.Session, issues: list[dict]) -> None:
@@ -237,13 +256,17 @@ def enrich_with_details(session: requests.Session, issues: list[dict]) -> None:
         try:
             response = session.get(issue["url"], timeout=(5, 15))
             response.raise_for_status()
-            full_text = parse_detail_page(response.content)
+            snapshot = parse_detail_page(response.content)
         except requests.RequestException as exc:
             log(f"   ⚠️  {issue['line']}: 詳細取得に失敗（一覧の要約を使用）: {exc}")
             continue
 
-        if full_text:
-            issue["detail"] = full_text
+        if snapshot and snapshot["all_clear"]:
+            issues.remove(issue)
+            log(f"   ℹ️  {issue['line']}: 詳細ページで平常運転への復旧を確認")
+        elif snapshot:
+            issue["status"] = snapshot["status"]
+            issue["detail"] = snapshot["detail"]
             issue["detail_truncated"] = False
         else:
             log(f"   ⚠️  {issue['line']}: 詳細ページを解析できませんでした（一覧の要約を使用）")
