@@ -3,5 +3,6 @@
 # 更新時は tests/ を通してから上げること。
 requests==2.34.2
 beautifulsoup4==4.15.0
-urllib3==2.7.0
+urllib3==2.8.0
 lxml==6.1.2
+certifi==2026.10.19
