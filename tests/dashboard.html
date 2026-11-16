@@ -55,13 +55,14 @@
     await test('stale warning survives the next schedule and overnight grace', (w, d) => {
         const OriginalDate = w.Date;
         const cases = [
-            ['2026-09-26T08:44:59+09:00', '2026-09-25T17:30:00+09:00', false],
-            ['2026-09-26T08:45:00+09:00', '2026-09-25T17:30:00+09:00', true],
-            ['2026-09-26T11:40:00+09:00', '2026-09-25T17:30:00+09:00', true],
-            ['2026-09-26T11:46:00+09:00', '2026-09-25T17:30:00+09:00', true],
-            ['2026-09-26T13:16:00+09:00', '2026-09-25T17:30:00+09:00', true],
-            ['2026-09-26T11:46:00+09:00', '2026-09-26T07:30:00+09:00', false],
-            ['2026-09-26T13:16:00+09:00', '2026-09-26T12:00:00+09:00', false],
+            ['2026-09-26T07:21:59+09:00', '2026-09-25T17:30:00+09:00', false],
+            ['2026-09-26T07:22:00+09:00', '2026-09-25T17:30:00+09:00', true],
+            ['2026-09-26T07:30:00+09:00', '2026-09-26T00:38:00+09:00', true],
+            ['2026-09-26T09:25:00+09:00', '2026-09-25T17:30:00+09:00', true],
+            ['2026-09-26T11:33:59+09:00', '2026-09-26T07:10:00+09:00', false],
+            ['2026-09-26T11:34:00+09:00', '2026-09-26T07:10:00+09:00', true],
+            ['2026-09-26T17:03:59+09:00', '2026-09-26T11:50:00+09:00', false],
+            ['2026-09-26T17:04:00+09:00', '2026-09-26T11:50:00+09:00', true],
         ];
         for (const [now, updated, expected] of cases) {
             w.Date = class extends OriginalDate {
@@ -204,12 +205,41 @@
         assert(w.scrollY > 0 && d.scrollingElement === d.documentElement, 'Document not scrolling');
         assert(Math.abs(d.querySelector('.header').getBoundingClientRect().top) < 1, 'Sticky header moved');
     });
+    await test('compound status, theme query, unmatched count, and offline retry', async (w, d) => {
+        assert(w.getStatusClass('運転再開') === 'status-success', 'Single recovery should be green');
+        assert(w.getStatusClass('運転再開・列車遅延') === 'status-warning', 'Compound delay should be warning');
+        assert(w.getStatusClass('運転再開・運休') === 'status-danger', 'Compound suspension should be danger');
+
+        document.body.style.backgroundColor = '#17171c';
+        w.detectAndApplyTheme('?theme=light');
+        assert(d.body.className === 'light-theme', 'Query light theme override failed');
+        document.body.style.backgroundColor = '#fff';
+        w.detectAndApplyTheme('?theme=dark');
+        assert(d.body.className === 'dark-theme', 'Query dark theme override failed');
+
+        w.render({ ...data, status: 'all_clear', issue_count: 0, issues: [], unmatched_lines: ['山手線', '京王線'] });
+        assert(d.getElementById('content').textContent.includes('監視中: 50/52路線'), 'Matched line ratio missing');
+
+        const originalFetch = w.fetch;
+        w.eval('lastData = null');
+        w.fetch = async () => { throw new w.TypeError('Failed to fetch'); };
+        await w.loadTransitData();
+        assert(d.querySelector('.error-message').textContent.includes('通信エラーが発生しました'), 'Raw English network error shown');
+        w.fetch = originalFetch;
+        d.querySelector('.retry-button').click();
+        for (let i = 0; i < 50 && !w.eval('lastData'); i++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        assert(w.eval('lastData') && d.querySelectorAll('.line-item').length === 3, 'Retry button did not recover');
+    });
     window.testResults = { passed: results.filter(r => r.passed).length, failed: results.filter(r => !r.passed).length, userAgent: navigator.userAgent, results, metrics };
     document.getElementById('results').textContent = JSON.stringify(window.testResults, null, 2);
     document.title = `${window.testResults.failed ? 'FAIL' : 'PASS'}: Transit dashboard tests`;
+    fetch('/__report__', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(window.testResults) }).catch(() => {});
 })().catch(error => {
     window.testResults = { failed: 1, error: error.stack };
     document.getElementById('results').textContent = error.stack;
+    fetch('/__report__', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(window.testResults) }).catch(() => {});
 });
 </script>
 </body>

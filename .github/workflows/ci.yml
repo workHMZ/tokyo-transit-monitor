@@ -1,0 +1,35 @@
+name: 🧪 CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 🧪 Parser & Dashboard Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v7
+
+      - name: ⚡ Setup uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: '3.13'
+          enable-cache: true
+
+      - name: 🧪 Run parser tests
+        run: |
+          uv run --with-requirements requirements.txt --with pytest==9.2.0 \
+            python -m pytest tests/test_parser.py -q
+
+      - name: 🌐 Run browser regression tests
+        run: |
+          uv run python tests/run_browser_tests.py

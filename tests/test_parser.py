@@ -238,3 +238,29 @@ def test_active_detail_takes_precedence_over_normal():
     )
     result = app.parse_detail_page(html.encode())
     assert result == {"status": "運休", "detail": "一部列車は運休します", "all_clear": False}
+
+
+def test_ensure_monitored_lines_present_rejects_broken_page(monitored):
+    with pytest.raises(app.TransitParseError):
+        app.ensure_monitored_lines_present(set(), monitored)
+    with pytest.raises(app.TransitParseError):
+        app.ensure_monitored_lines_present({"山手線"}, monitored)
+    app.ensure_monitored_lines_present(monitored - {"山手線"}, monitored)
+
+
+@pytest.mark.parametrize("bad_href", [
+    "http://transit.yahoo.co.jp/diainfo/21/0",
+    "https://example.com/diainfo/21/0",
+    "javascript:alert(1)",
+])
+def test_disallowed_detail_url_falls_back_to_target(monitored, bad_href):
+    html = (
+        '<div id="mdStatusTroubleLine"><table>'
+        f'<tr><td><a href="{bad_href}">山手線</a></td><td>列車遅延</td><td>遅れが出ています...</td></tr>'
+        '</table></div>'
+    )
+    issues = app.parse_trouble_rows(app.make_soup(html), monitored)
+    assert issues[0]["url"] == app.TARGET_URL
+    session = _FakeSession()
+    app.enrich_with_details(session, issues)
+    assert session.calls == 0

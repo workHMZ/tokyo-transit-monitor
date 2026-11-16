@@ -176,6 +176,10 @@
             padding: 0.5rem;
         }
 
+        .content:focus {
+            outline: none;
+        }
+
         .status-summary {
             padding: 0.75rem 1rem;
             margin-bottom: 0.5rem;
@@ -371,6 +375,23 @@
             font-size: 12px;
         }
 
+        .retry-button {
+            margin-top: 0.6rem;
+            padding: 0.3rem 0.7rem;
+            border: 1px solid var(--color-widget-content-border);
+            border-radius: var(--border-radius);
+            background-color: var(--color-widget-background);
+            color: var(--color-text-highlight);
+            font: inherit;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .retry-button:focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
         .footer {
             padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
             border-top: 1px solid var(--color-widget-content-border);
@@ -437,6 +458,12 @@
                 min-height: 44px;
                 font-size: 12px;
             }
+
+            .retry-button {
+                min-height: 40px;
+                padding: 0.4rem 0.9rem;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -453,7 +480,7 @@
             </div>
         </div>
         <div class="data-info" id="dataInfo">
-            📅 データ取得: <span id="fetchTime">--</span>
+            📅 データ取得: <span id="fetchTime">--</span> (JST)
         </div>
 
         <div class="notice" id="staleBanner" role="status"></div>
@@ -471,22 +498,36 @@
 
     <script>
         // Theme detection
-        // 基本は OS の設定に従い、同一オリジンの iframe に埋め込まれている場合だけ親の背景色に合わせる。
-        function detectAndApplyTheme() {
-            let isLightTheme = window.matchMedia('(prefers-color-scheme: light)').matches;
-            try {
-                if (window.parent && window.parent !== window) {
+        // 優先順: ?theme=light|dark クエリ > 同一オリジン iframe 親背景色 > OS 設定。
+        let canReadParent = Boolean(window.parent && window.parent !== window);
+
+        function getForcedTheme(search = window.location.search) {
+            const param = new URLSearchParams(search).get('theme');
+            return param === 'light' || param === 'dark' ? param : null;
+        }
+
+        function detectAndApplyTheme(search = window.location.search) {
+            const forced = getForcedTheme(search);
+            let isLightTheme = forced
+                ? forced === 'light'
+                : window.matchMedia('(prefers-color-scheme: light)').matches;
+
+            if (!forced && canReadParent) {
+                try {
                     const parentBody = window.parent.document.body;
-                    const parentBg = window.getComputedStyle(parentBody).backgroundColor;
-                    const rgb = parentBg.startsWith('rgb') ? parentBg.match(/[\d.]+/g) : null;
-                    // 透明 (alpha 0) の背景からは明暗を判定できないので OS 設定のままにする
-                    if (rgb && (rgb.length < 4 || parseFloat(rgb[3]) > 0)) {
-                        const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
-                        isLightTheme = brightness > 127;
+                    if (parentBody) {
+                        const parentBg = window.getComputedStyle(parentBody).backgroundColor;
+                        const rgb = parentBg.startsWith('rgb') ? parentBg.match(/[\d.]+/g) : null;
+                        // 透明 (alpha 0) の背景からは明暗を判定できないので OS 設定のままにする
+                        if (rgb && (rgb.length < 4 || parseFloat(rgb[3]) > 0)) {
+                            const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
+                            isLightTheme = brightness > 127;
+                        }
                     }
+                } catch (e) {
+                    // クロスオリジン iframe（Glance 等）では親を参照できないため以降のポーリングも止める
+                    canReadParent = false;
                 }
-            } catch (e) {
-                // クロスオリジンの iframe では親を参照できない。OS 設定に従う。
             }
             document.body.className = isLightTheme ? 'light-theme' : 'dark-theme';
             // スクロールバー等の UA 部品もテーマに合わせる（color-scheme はルート要素に効かせる必要がある）
@@ -494,12 +535,12 @@
         }
 
         if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', detectAndApplyTheme);
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => detectAndApplyTheme());
         }
         detectAndApplyTheme();
 
-        // Check theme when embedded in iframe (every 5s)
-        if (window.parent && window.parent !== window) {
+        // 同一オリジンの iframe に埋め込まれ、かつ ?theme= 固定でない場合のみ親テーマを追従
+        if (canReadParent && !getForcedTheme()) {
             setInterval(detectAndApplyTheme, 5000);
         }
 
@@ -508,6 +549,14 @@
             if (!status) return 'status-warning';
             if (status.includes('見合わせ') || status.includes('運休')) {
                 return 'status-danger';
+            }
+            if (
+                status.includes('遅延') ||
+                status.includes('運転状況') ||
+                status.includes('その他') ||
+                status.includes('計画')
+            ) {
+                return 'status-warning';
             }
             if (status.includes('再開') || status.includes('平常') || status.includes('正常')) {
                 return 'status-success';
@@ -521,14 +570,14 @@
         const FETCH_TIMEOUT_MS = 15 * 1000;
 
         // スクレイパーの cron 発火時刻 (UTC)。workflow の schedule と一致させること。
-        // 22:15Z -> 7:30 JST / 02:45Z -> 12:00 JST / 08:15Z -> 17:30 JST
+        // 20:07Z = 05:07 JST (目標 07:30 JST)
+        // 00:19Z = 09:19 JST (目標 12:00 JST)
+        // 05:49Z = 14:49 JST (目標 17:30 JST)
         //
-        // 固定時間のしきい値だと、17:30 -> 翌 7:30 の 14 時間の間隔を許容するために
-        // 15 時間まで緩める必要があり、日中に1回飛んでも夕方まで気づけなかった。
-        // 「直近で実行されるはずだった時刻」を基準にすることで、
-        // 1回飛んだだけでも猶予 90 分後に検知できる。
-        const SCHEDULE_UTC = [[22, 15], [2, 45], [8, 15]];
-        const GRACE_MS = 90 * 60 * 1000;
+        // GitHub Actions のキュー遅延を見込んで前倒し発火させ、各目標時刻の直前
+        // (発火から 135 分後 = 07:22 / 11:34 / 17:04 JST) までに完了していなければ警告する。
+        const SCHEDULE_UTC = [[20, 7], [0, 19], [5, 49]];
+        const GRACE_MS = 135 * 60 * 1000;
 
         // 直近の「実行されるはずだった時刻」を UTC で求める。
         // 閲覧者のタイムゾーンに依存しないよう、全て UTC で計算する。
@@ -609,11 +658,11 @@
         function replaceContent(html) {
             if (html === renderedContent) return;
             const content = document.getElementById('content');
-            const focused = document.activeElement;
+            const focused = document.activeElement instanceof Element ? document.activeElement : null;
             const oldItems = Array.from(content.querySelectorAll('.line-item'));
-            const focusedItem = focused.closest('.line-item');
-            const focusedIndex = oldItems.indexOf(focusedItem);
-            const control = focused.matches('.line-link') ? '.line-link' : '.line-header';
+            const focusedItem = focused ? focused.closest('.line-item') : null;
+            const focusedIndex = focusedItem ? oldItems.indexOf(focusedItem) : -1;
+            const control = focused && focused.matches('.line-link') ? '.line-link' : '.line-header';
 
             content.innerHTML = html;
             renderedContent = html;
@@ -664,10 +713,15 @@
         }
 
         function render(data) {
+            if (!data || typeof data !== 'object') {
+                throw new Error('データ形式が不正です');
+            }
             const statusDot = document.getElementById('statusDot');
+            const issues = Array.isArray(data.issues) ? data.issues : [];
+            const issueCount = issues.length;
 
             document.getElementById('updateTime').textContent =
-                data.issue_count > 0 ? `${data.issue_count}件の運行情報` : '正常';
+                issueCount > 0 ? `${issueCount}件の運行情報` : '正常';
             document.getElementById('fetchTime').textContent = data.update_time || '不明';
             updateStaleBanner(data, statusDot);
 
@@ -677,13 +731,19 @@
                 ? `ℹ️ Yahoo!上で見つからない監視対象路線があります（改名の可能性）: ${unmatched.join('、')}`
                 : '');
 
-            if (data.status === 'all_clear' || !data.issue_count) {
+            const totalLines = Number(data.monitored_lines_count) || 0;
+            const matchedLines = Math.max(0, totalLines - unmatched.length);
+            const monitoredLabel = unmatched.length > 0
+                ? `監視中: ${matchedLines}/${totalLines}路線`
+                : `監視中: ${totalLines}路線`;
+
+            if (data.status === 'all_clear' || issueCount === 0) {
                 statusDot.classList.remove('has-issues');
                 replaceContent(`
                     <div class="all-clear">
                         <div class="all-clear-icon">✅</div>
                         <div class="all-clear-text">全線正常運転中</div>
-                        <div style="margin-top: 0.5rem; font-size: 11px;">監視中: ${Number(data.monitored_lines_count) || 0}路線</div>
+                        <div style="margin-top: 0.5rem; font-size: 11px;">${monitoredLabel}</div>
                     </div>
                 `);
                 return;
@@ -692,12 +752,21 @@
             statusDot.classList.add('has-issues');
             replaceContent(`
                 <div class="status-summary has-issues">
-                    <div class="summary-text">⚠️ ${Number(data.issue_count) || 0}件の運行情報があります</div>
+                    <div class="summary-text">⚠️ ${issueCount}件の運行情報があります</div>
                 </div>
                 <div class="line-list">
-                    ${(data.issues || []).map(renderIssue).join('')}
+                    ${issues.map(renderIssue).join('')}
                 </div>
             `);
+        }
+
+        function formatLoadError(error, aborted) {
+            if (aborted) return 'データの取得がタイムアウトしました';
+            const msg = error && typeof error.message === 'string' ? error.message : '';
+            if (!msg || error instanceof TypeError || /^(Failed to fetch|Load failed|NetworkError)/i.test(msg)) {
+                return '通信エラーが発生しました';
+            }
+            return msg;
         }
 
         async function loadTransitData() {
@@ -713,6 +782,7 @@
             try {
                 const response = await fetch(DATA_URL + '?t=' + Date.now(), {
                     signal: request.controller.signal,
+                    cache: 'no-store',
                 });
                 if (!response.ok) throw new Error('データを取得できませんでした');
 
@@ -729,15 +799,14 @@
                         '⚠️ 最新データを取得できませんでした。前回取得分を表示しています。');
                     updateStaleBanner(lastData, document.getElementById('statusDot'));
                 } else {
-                    const message = request.controller.signal.aborted
-                        ? 'データの取得がタイムアウトしました'
-                        : error.message;
+                    const message = formatLoadError(error, request.controller.signal.aborted);
                     document.getElementById('updateTime').textContent = '取得失敗';
                     document.getElementById('statusDot').classList.add('stale');
                     replaceContent(`
                         <div class="error-message">
                             ⚠️ ${escapeHtml(message)}<br>
-                            <small>ページをリロードしてお試しください</small>
+                            <small>電波状況を確認して再試行してください</small><br>
+                            <button type="button" class="retry-button">再試行</button>
                         </div>
                     `);
                 }
@@ -759,13 +828,20 @@
             })[ch]);
         }
 
-        // カードのどこをクリック/タップしても開閉する（リンクは除く）
+        // カードのどこをクリック/タップしても開閉する（リンク・再試行ボタンは除く）
         document.getElementById('content').addEventListener('click', (event) => {
+            if (event.target.closest('.retry-button')) {
+                loadTransitData();
+                return;
+            }
             if (event.target.closest('a')) return;
             const item = event.target.closest('.line-item');
             if (!item) return;
-            // Mac で本文をドラッグ選択してコピーしようとしたときは閉じない
-            if (!event.target.closest('.line-header') && String(window.getSelection())) return;
+            // Mac でこのカード内の本文をドラッグ選択してコピーしようとしたときは閉じない
+            const selection = window.getSelection ? window.getSelection() : null;
+            if (!event.target.closest('.line-header') && selection && String(selection) && item.contains(selection.anchorNode)) {
+                return;
+            }
 
             const expanded = item.classList.toggle('expanded');
             item.querySelector('.line-header').setAttribute('aria-expanded', String(expanded));

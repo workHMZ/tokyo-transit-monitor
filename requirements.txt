@@ -1,8 +1,12 @@
-# バージョンは固定する。
+# バージョンは固定する（間接依存を含む）。
 # 上流の破壊的変更で CI が突然壊れるのを防ぐため。
 # 更新時は tests/ を通してから上げること。
 requests==2.34.2
 beautifulsoup4==4.15.0
 urllib3==2.8.0
-lxml==6.1.2
-certifi==2026.10.19
+lxml==6.1.3
+certifi==2026.10.23
+charset-normalizer==3.5.2
+idna==3.20
+soupsieve==4.1.1
+typing-extensions==4.16.0

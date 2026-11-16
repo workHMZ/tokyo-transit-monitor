@@ -14,6 +14,7 @@ from urllib3.util.retry import Retry
 
 # --- 設定 ---
 TARGET_URL = "https://transit.yahoo.co.jp/diainfo/area/4"
+ALLOWED_DETAIL_PREFIX = "https://transit.yahoo.co.jp/diainfo/"
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = BASE_DIR / "transit_data.json"
 LINES_FILE = BASE_DIR / "lines.json"
@@ -147,7 +148,12 @@ def parse_trouble_rows(soup: BeautifulSoup, monitored: set[str]) -> list[dict]:
         link = cells[0].find("a")
         if link:
             line_name = link.get_text(" ", strip=True)
-            detail_url = urljoin(TARGET_URL, link.get("href", ""))
+            candidate_url = urljoin(TARGET_URL, link.get("href", ""))
+            detail_url = (
+                candidate_url
+                if candidate_url.startswith(ALLOWED_DETAIL_PREFIX)
+                else TARGET_URL
+            )
         else:
             line_name = cells[0].get_text(" ", strip=True)
             detail_url = TARGET_URL
@@ -233,12 +239,27 @@ def parse_detail_page(html: bytes) -> dict | None:
     }
 
 
+def ensure_monitored_lines_present(page_lines: set[str], monitored: set[str]) -> None:
+    """
+    ページ上の路線一覧が取得不能・大幅欠損している場合に誤った all_clear 公開を防ぐ。
+    """
+    matched_count = len(page_lines & monitored)
+    if matched_count * 2 < len(monitored):
+        raise TransitParseError(
+            f"監視対象路線の確認数が少なすぎます ({matched_count}/{len(monitored)}路線)。"
+            "Yahoo! のHTML構造が変更された可能性があります。"
+        )
+
+
 def enrich_with_details(session: requests.Session, issues: list[dict]) -> None:
     """
     一覧ページの詳細文はYahoo!側で「...」に切り詰められている。
     問題のある路線だけ詳細ページを引いて全文に差し替える。
     """
-    targets = [i for i in issues if i["url"] != TARGET_URL][:DETAIL_FETCH_LIMIT]
+    targets = [
+        i for i in issues
+        if i["url"] != TARGET_URL and i["url"].startswith(ALLOWED_DETAIL_PREFIX)
+    ][:DETAIL_FETCH_LIMIT]
     if not targets:
         return
 
@@ -280,7 +301,9 @@ def scrape_transit_data(monitored: set[str]) -> tuple[list[dict], list[str]]:
 
         soup = make_soup(response.content)
         issues = parse_trouble_rows(soup, monitored)
-        missing = warn_missing_lines(collect_page_line_names(soup), monitored)
+        page_lines = collect_page_line_names(soup)
+        ensure_monitored_lines_present(page_lines, monitored)
+        missing = warn_missing_lines(page_lines, monitored)
 
         if issues and FETCH_DETAIL_PAGES:
             enrich_with_details(session, issues)

@@ -1,27 +1,24 @@
 # =============================================================================
 # 定期スクレイピング + Synology Chat 通知 + GitHub Pages 更新
 # =============================================================================
-# トリガー: 毎日 7:30, 12:00, 17:30 (JST) 自動実行 または 手動トリガー
+# トリガー: 毎日 7:30, 12:00, 17:30 (JST) 前後を目標に自動実行 または 手動トリガー
 # 機能: 東京圏の運行情報を取得し、Synology Chatへ通知 & GitHub Pagesを更新
 # =============================================================================
 
-name: 🚃 Run Scraper (7:30AM, 12PM & 5:30PM JST)
+name: 🚃 Run Scraper (Target 7:30AM, 12PM & 5:30PM JST)
 
 on:
-  # 【重要】cron は UTC で書き、timezone キーは使わないこと。
+  # 【重要】cron は UTC で明示し、GitHub Actions のキュー遅延を見込んで前倒し設定する。
   #
-  # GitHub Actions の `timezone:` は 2026-03 に Public Preview として追加されたが、
-  # 2026-08-27 昼(UTC)を境に本リポジトリでは適用されなくなり、
-  # cron が UTC として解釈されるようになった（= 定時実行が JST 16:30/21:00/02:30 にずれ、
-  # 12:00 JST の実行が消失）。同一コミット・同一ファイルのまま挙動が変わったため、
-  # プレビュー機能には依存せず、UTC で明示的に書く方式に戻している。
-  #
-  # JST = UTC + 9。GitHub 側のスケジューラ遅延(通常 20〜50分)を見込み、
-  # V1 と同じく目標時刻の15分前に設定している。
+  # JST = UTC + 9。2026年後半以降、公開リポジトリの `on: schedule` には
+  # 数時間規模のキュー遅延が日常的に発生するため、毎正時・15分刻みの混雑帯を避けつつ
+  # 目標時刻（7:30 / 12:00 / 17:30 JST）の約 2〜2.5 時間前に発火させている。
+  # 朝枠は遅延ゼロで即実行された場合でも始発後の運行情報を拾える 5:07 JST 以降とする。
+  # 変更時は index.html の SCHEDULE_UTC も必ず揃えること。
   schedule:
-    - cron: '15 22 * * *'  # 目標 7:30 JST  (= 前日 22:30 UTC の15分前)
-    - cron: '45 2 * * *'   # 目標 12:00 JST (= 当日 03:00 UTC の15分前)
-    - cron: '15 8 * * *'   # 目標 17:30 JST (= 当日 08:30 UTC の15分前)
+    - cron: '7 20 * * *'   # 05:07 JST 発火 -> 目標 07:30 JST 前後 (= 前日 20:07 UTC)
+    - cron: '19 0 * * *'   # 09:19 JST 発火 -> 目標 12:00 JST 前後 (= 当日 00:19 UTC)
+    - cron: '49 5 * * *'   # 14:49 JST 発火 -> 目標 17:30 JST 前後 (= 当日 05:49 UTC)
   
   workflow_dispatch:
     inputs:
@@ -54,7 +51,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: ⚡ Setup uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: '3.13'
           enable-cache: true
@@ -65,7 +62,7 @@ jobs:
           echo "🧪 パーサーの回帰テストを実行中..."
           echo "=========================================="
 
-          uv run --with-requirements requirements.txt --with pytest \
+          uv run --with-requirements requirements.txt --with pytest==9.2.0 \
             python -m pytest tests/ -q
 
       - name: 🚀 Run Scraper
@@ -95,10 +92,13 @@ jobs:
             exit 0
           fi
 
-          # Webhook URLの引用符や%22を整形
+          # Webhook URLの引用符や%22を整形（変形後の文字列も公開ログに出ないようマスク登録）
           WEBHOOK_URL="${SYNOLOGY_WEBHOOK%\"}"
           WEBHOOK_URL="${WEBHOOK_URL#\"}"
-          WEBHOOK_URL=$(echo "$WEBHOOK_URL" | sed 's/token=%22/token=/g; s/%22$//g; s/token="/token=/g; s/"$//g')
+          WEBHOOK_URL=$(printf '%s' "$WEBHOOK_URL" | sed 's/token=%22/token=/g; s/%22$//g; s/token="/token=/g; s/"$//g')
+          if [ -n "$WEBHOOK_URL" ]; then
+            echo "::add-mask::$WEBHOOK_URL"
+          fi
 
           # jq を使用してフォーマット済みメッセージを構築
           MESSAGE=$(jq -r '
@@ -109,8 +109,17 @@ jobs:
                 .
               end;
 
+            def unmatched_note:
+              if ((.unmatched_lines // []) | length) > 0 then
+                "\n\nℹ️ Yahoo!上で未確認の監視対象路線: " + ((.unmatched_lines // []) | join("、"))
+              else
+                ""
+              end;
+
             if .status == "all_clear" or .issue_count == 0 then
-              "✅ 【東京交通情報】全線正常運転中！\n\n🕐 更新時間: \(.update_time // "Unknown") (JST)\n\n🔗 詳細: <https://workhmz.github.io/tokyo-transit-monitor/|Tokyo Transit Monitor>"
+              "✅ 【東京交通情報】全線正常運転中！\n\n🕐 更新時間: \(.update_time // "Unknown") (JST)" +
+              unmatched_note +
+              "\n\n🔗 詳細: <https://workhmz.github.io/tokyo-transit-monitor/|Tokyo Transit Monitor>"
             else
               (
                 "⚠️ 【東京交通情報】\(.issue_count)件の運行情報\n\n🕐 更新: \(.update_time // "Unknown") (JST)\n\n" +
@@ -120,6 +129,7 @@ jobs:
                   ) | join("\n")
                 ) +
                 (if (.issue_count // 0) > 5 then "\n  ...他 \((.issue_count // 0) - 5) 件の運行情報" else "" end) +
+                unmatched_note +
                 "\n\n🔗 詳細: <https://workhmz.github.io/tokyo-transit-monitor/|Tokyo Transit Monitor>"
               )
             end
@@ -139,14 +149,19 @@ jobs:
           # JSON payloadの構築
           PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
 
-          # Synology Chat Incoming Webhook へPOST送信
-          curl --fail-with-body -sS \
+          # Synology Chat Incoming Webhook へPOST送信（通知失敗でも Pages 更新は止めない）
+          if curl --fail-with-body -sS \
+            --connect-timeout 10 \
+            --max-time 30 \
             -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            --data-urlencode "payload=$PAYLOAD"
-
-          echo ""
-          echo "✅ Synology Chat 通知の送信が完了しました。"
+            --data-urlencode "payload=$PAYLOAD"; then
+            echo ""
+            echo "✅ Synology Chat 通知の送信が完了しました。"
+          else
+            echo ""
+            echo "::warning::Synology Chat への通知送信に失敗しました（Pages の更新は続行します）。"
+          fi
 
       - name: 📦 Prepare Pages
         run: |
