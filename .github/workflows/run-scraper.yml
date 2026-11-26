@@ -181,9 +181,25 @@ jobs:
     needs: run-scraper
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
+      # Pages API occasionally returns transient 5xx on "create deployment"
+      # (e.g. run 45651266133). Retry once after a short wait instead of
+      # leaving the dashboard stale until the next scheduled run.
       - name: Deploy to GitHub Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - name: Wait before retry
+        if: steps.deployment.outcome == 'failure'
+        run: |
+          echo "::warning::Pages deployment failed on first attempt; retrying in 60s."
+          sleep 60
+
+      - name: Deploy to GitHub Pages (retry)
+        id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
